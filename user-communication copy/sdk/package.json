@@ -1,0 +1,19 @@
+{
+  "name": "crm-comm-timeline-sdk",
+  "version": "0.1.0",
+  "description": "Embeddable communication timeline SDK for CRM systems",
+  "main": "dist/comm-timeline-sdk.js",
+  "module": "dist/comm-timeline-sdk.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc && node build.mjs",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "esbuild": "^0.21.4"
+  },
+  "files": [
+    "dist"
+  ]
+}
