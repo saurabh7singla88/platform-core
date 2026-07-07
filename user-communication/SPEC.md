@@ -1,5 +1,6 @@
 # CRM Communication Timeline SDK — Product Specification
 
+1
 ## 1. Overview
 
 An independent, plug-and-play SDK that provides a unified communication timeline for any CRM. It logs, indexes, and displays all user communications (calls, SMS, email, VoIP, physical mail) in a single embeddable widget.
