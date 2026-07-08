@@ -1,0 +1,49 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: comm_timeline
+      POSTGRES_USER: comm_user
+      POSTGRES_PASSWORD: comm_pass
+      TZ: Asia/Kolkata
+      PGTZ: Asia/Kolkata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comm_user -d comm_timeline"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://comm_user:comm_pass@postgres:5432/comm_timeline
+      PORT: 8080
+      ALLOWED_ORIGINS: http://localhost:3000
+      NODE_ENV: production
+      DATABASE_SSL: "false"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  widget:
+    build:
+      context: .
+      dockerfile: packages/widget/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+
+volumes:
+  postgres_data:

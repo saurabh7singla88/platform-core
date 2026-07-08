@@ -1,0 +1,19 @@
+{
+  "name": "user-communication",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "dev:widget": "npm run dev --workspace=packages/widget",
+    "dev:sdk": "npm run dev --workspace=packages/sdk",
+    "build": "npm run build --workspaces --if-present",
+    "db:migrate": "npm run migrate --workspace=packages/backend",
+    "docker:up": "docker compose up --build",
+    "docker:up:detached": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:db": "docker compose up postgres -d"
+  }
+}

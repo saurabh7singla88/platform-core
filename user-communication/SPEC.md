@@ -17,10 +17,10 @@ An independent, plug-and-play SDK that provides a unified communication timeline
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Backend API | Java (Spring Boot) + PostgreSQL | Timeline/detail APIs, ingestion, admin |
+| Backend API | Node.js (Express) + PostgreSQL | Timeline/detail APIs, ingestion, admin |
 | Widget App | React + TypeScript | Embeddable iframe UI (timeline + details) |
 | Host SDK | JavaScript/TypeScript | Mounts iframe, passes context, exposes methods |
-| Connector Layer | Java | Source adapters for push/pull ingestion |
+| Connector Layer | Node.js | Source adapters for push/pull ingestion |
 
 ---
 
@@ -342,7 +342,7 @@ Messages from widget → host:
          │ API calls (JWT)
          ▼
 ┌─────────────────────────────────────────────────┐
-│  Backend (Spring Boot)                          │
+│  Backend (Node.js)                              │
 │  - Timeline API                                 │
 │  - Event Detail API (+ on-demand source fetch)  │
 │  - Webhook Receiver                             │
@@ -362,11 +362,11 @@ Messages from widget → host:
 ## 13. Implementation Phases
 
 ### Phase 1 — Foundation (Weeks 1–2)
-- [ ] Project scaffolding (Spring Boot + React + SDK)
-- [ ] Database schema + migrations
-- [ ] Timeline API + Event Detail API
-- [ ] Widget UI with mock data (timeline + detail navigation)
-- [ ] SDK mount/unmount + postMessage protocol
+- [x] Project scaffolding (Node.js + React + SDK)
+- [x] Database schema + migrations
+- [x] Timeline API + Event Detail API
+- [x] Widget UI with mock data (timeline + detail navigation)
+- [x] SDK mount/unmount + postMessage protocol
 
 ### Phase 2 — Ingestion (Weeks 3–4)
 - [ ] Webhook receiver framework + signature validation
@@ -406,8 +406,8 @@ Messages from widget → host:
 | 3 | Detail content caching | Redis with short TTL (5 min) |
 | 4 | SDK distribution | Both CDN + npm |
 | 5 | Admin UI | API-only for v1, UI in v2 |
-| 6 | Java version | 21 (virtual threads) |
-| 7 | Build tool | Maven |
+| 6 | Node.js version | 22 (LTS) |
+| 7 | Build tool | npm |
 | 8 | Frontend package manager | npm |
 | 9 | Repo structure | Monorepo |
 | 10 | First connector (MVP) | Generic ingest API only |
@@ -424,7 +424,7 @@ Dockerize everything; deployment topology decided later.
 
 | Component | Artifact | Details |
 |-----------|----------|---------|
-| Backend | Docker image | Java 21 + Spring Boot fat jar |
+| Backend | Docker image | Node.js 22 app |
 | Widget | Docker image | Nginx serving React production build |
 | SDK | Static JS bundle | Bundled with widget or publishable to CDN separately |
 | Database | PostgreSQL container | Official image, volume-mounted data |
@@ -433,7 +433,7 @@ Dockerize everything; deployment topology decided later.
 
 ```yaml
 # docker-compose.yml provides:
-- backend (Spring Boot, port 8080)
+- backend (Node.js, port 8080)
 - widget (Nginx, port 3000)
 - postgres (port 5432)
 ```
