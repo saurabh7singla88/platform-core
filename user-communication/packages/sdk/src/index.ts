@@ -3,7 +3,9 @@ import { MountConfig, FilterConfig, EntityType, Channel, SDK } from './types';
 type WidgetMessage =
   | { type: 'WIDGET_LOADED' }
   | { type: 'EVENT_CLICKED'; payload: { eventId: string; channel: Channel } }
-  | { type: 'WIDGET_ERROR'; payload: { code: string; message: string } };
+  | { type: 'WIDGET_ERROR'; payload: { code: string; message: string } }
+  | { type: 'RESIZE'; payload: { height: number } }
+  | { type: 'TOKEN_REQUEST' };
 
 class CRMCommTimelineInstance implements SDK {
   private iframe: HTMLIFrameElement | null = null;
@@ -43,23 +45,25 @@ class CRMCommTimelineInstance implements SDK {
     window.addEventListener('message', this.listener);
   }
 
-  private handleWidgetMessage(msg: WidgetMessage): void {
+  private async handleWidgetMessage(msg: WidgetMessage): Promise<void> {
     switch (msg.type) {
       case 'WIDGET_LOADED':
         this.ready = true;
+        // Resolve token (static or via callback)
+        const token = await this.resolveToken();
         // Send initial config
-        this.send({
+        this.iframe?.contentWindow?.postMessage({
           type: 'INIT',
           payload: {
             entityType: this.config!.entityType,
             entityId: this.config!.entityId,
-            token: this.config!.token,
+            token,
             baseUrl: this.config!.baseUrl,
             theme: this.config!.theme ?? 'light',
             locale: this.config!.locale,
             allowedOrigin: window.location.origin,
           },
-        });
+        }, this.widgetOrigin!);
         // Flush buffered messages
         for (const m of this.pendingMessages) {
           this.iframe?.contentWindow?.postMessage(m, this.widgetOrigin!);
@@ -75,7 +79,36 @@ class CRMCommTimelineInstance implements SDK {
       case 'WIDGET_ERROR':
         this.config?.onError?.(msg.payload);
         break;
+
+      case 'RESIZE':
+        if (this.config?.autoResize && this.iframe) {
+          this.iframe.style.height = `${msg.payload.height}px`;
+        }
+        break;
+
+      case 'TOKEN_REQUEST': {
+        const refreshedToken = await this.resolveToken();
+        if (refreshedToken) {
+          this.iframe?.contentWindow?.postMessage(
+            { type: 'TOKEN_REFRESH', payload: { token: refreshedToken } },
+            this.widgetOrigin!,
+          );
+        }
+        break;
+      }
     }
+  }
+
+  private async resolveToken(): Promise<string> {
+    if (this.config?.getToken) {
+      try {
+        return await this.config.getToken();
+      } catch (err) {
+        this.config?.onError?.({ code: 'TOKEN_REFRESH_FAILED', message: String(err) });
+        return '';
+      }
+    }
+    return this.config?.token ?? '';
   }
 
   private send(msg: unknown): void {
@@ -122,6 +155,23 @@ class CRMCommTimelineInstance implements SDK {
 }
 
 const CRMCommTimeline = new CRMCommTimelineInstance();
+
+// Process any calls queued before the SDK loaded (async loader pattern)
+// Hosts can do: window.CRMCommTimeline = window.CRMCommTimeline || { q: [] };
+// then push calls: window.CRMCommTimeline.q.push(['mount', { ... }]);
+if (typeof window !== 'undefined') {
+  const prev = (window as unknown as Record<string, unknown>).CRMCommTimeline as
+    | { q?: Array<[string, ...unknown[]]> }
+    | undefined;
+  if (prev?.q && Array.isArray(prev.q)) {
+    for (const [method, ...args] of prev.q) {
+      if (typeof (CRMCommTimeline as unknown as Record<string, unknown>)[method] === 'function') {
+        (CRMCommTimeline as unknown as Record<string, (...a: unknown[]) => void>)[method](...args);
+      }
+    }
+  }
+  (window as unknown as Record<string, unknown>).CRMCommTimeline = CRMCommTimeline;
+}
 
 export default CRMCommTimeline;
 export { CRMCommTimeline };

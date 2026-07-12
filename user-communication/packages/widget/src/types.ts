@@ -63,9 +63,12 @@ export type HostToWidgetMessage =
   | { type: 'SET_ENTITY'; payload: { entityType: EntityType; entityId: string } }
   | { type: 'SET_FILTER'; payload: FilterConfig }
   | { type: 'OPEN_EVENT'; payload: { eventId: string } }
-  | { type: 'REFRESH' };
+  | { type: 'REFRESH' }
+  | { type: 'TOKEN_REFRESH'; payload: { token: string } };
 
 export type WidgetToHostMessage =
   | { type: 'WIDGET_LOADED' }
   | { type: 'EVENT_CLICKED'; payload: { eventId: string; channel: Channel } }
-  | { type: 'WIDGET_ERROR'; payload: { code: string; message: string } };
+  | { type: 'WIDGET_ERROR'; payload: { code: string; message: string } }
+  | { type: 'RESIZE'; payload: { height: number } }
+  | { type: 'TOKEN_REQUEST' };

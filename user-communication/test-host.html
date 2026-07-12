@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SDK Integration Test Page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+    h1 { font-size: 1.2rem; }
+    h2 { font-size: 1rem; margin-top: 24px; }
+    .test-section { background: #fff; padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #e0e0e0; }
+    .log { font-family: monospace; font-size: 0.8rem; background: #1e1e1e; color: #0f0; padding: 12px; border-radius: 4px; max-height: 200px; overflow-y: auto; margin-top: 8px; }
+    .log-entry { margin-bottom: 4px; }
+    .log-entry.error { color: #f44; }
+    .log-entry.success { color: #4f4; }
+    .log-entry.info { color: #8cf; }
+    button { padding: 6px 14px; border-radius: 4px; border: 1px solid #d1d5db; cursor: pointer; margin-right: 8px; margin-bottom: 6px; }
+    button:hover { background: #f0f0f0; }
+    #timeline-container { border: 2px solid #6366f1; border-radius: 8px; overflow: hidden; height: 500px; margin-top: 12px; }
+    #timeline-container.auto-resize { height: auto; min-height: 200px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+    .badge.pass { background: #dcfce7; color: #166534; }
+    .badge.fail { background: #fee2e2; color: #991b1b; }
+    .badge.pending { background: #fef9c3; color: #854d0e; }
+  </style>
+</head>
+<body>
+  <h1>CRM Communication Timeline — SDK Integration Tests</h1>
+
+  <!-- Test 1: Async Loader Queue -->
+  <div class="test-section">
+    <h2>1. Async Loader Queue Pattern <span id="badge-queue" class="badge pending">pending</span></h2>
+    <p>The mount() call below is made <strong>before</strong> the SDK script loads. If the widget renders, the queue pattern works.</p>
+  </div>
+
+  <!-- Test 2: Auto-Resize -->
+  <div class="test-section">
+    <h2>2. iframe Auto-Resize <span id="badge-resize" class="badge pending">pending</span></h2>
+    <p>iframe height updates dynamically based on widget content. Check the reported height below.</p>
+    <div>Current iframe height: <strong id="iframe-height">—</strong></div>
+    <button onclick="toggleAutoResize()">Toggle auto-resize mode</button>
+  </div>
+
+  <!-- Test 3: Token Refresh -->
+  <div class="test-section">
+    <h2>3. Token Refresh Callback <span id="badge-token" class="badge pending">pending</span></h2>
+    <p>SDK uses <code>getToken()</code> callback instead of a static token. Check log for token resolution.</p>
+    <div>Token refreshes: <strong id="token-count">0</strong></div>
+  </div>
+
+  <!-- Test 4: Keyboard Accessibility -->
+  <div class="test-section">
+    <h2>4. Keyboard Accessibility <span id="badge-a11y" class="badge pending">pending</span></h2>
+    <p>Click inside the widget, then test:</p>
+    <ul style="font-size: 0.85rem; margin: 8px 0;">
+      <li><kbd>↓</kbd> / <kbd>↑</kbd> — Navigate between timeline items</li>
+      <li><kbd>Enter</kbd> or <kbd>Space</kbd> — Open focused item</li>
+      <li><kbd>Escape</kbd> — Return from detail view to timeline</li>
+      <li><kbd>Tab</kbd> — Move through interactive elements</li>
+    </ul>
+    <button onclick="markA11yPass()">✓ Mark as Passed (manual)</button>
+    <button onclick="markA11yFail()">✗ Mark as Failed (manual)</button>
+  </div>
+
+  <!-- Test 5: Sandbox attribute -->
+  <div class="test-section">
+    <h2>5. Sandbox Attribute <span id="badge-sandbox" class="badge pending">pending</span></h2>
+    <p>iframe should have <code>sandbox="allow-scripts allow-same-origin allow-popups"</code></p>
+    <button onclick="checkSandbox()">Verify Sandbox</button>
+  </div>
+
+  <!-- SDK Methods -->
+  <div class="test-section">
+    <h2>SDK Method Controls</h2>
+    <button onclick="callRefresh()">refresh()</button>
+    <button onclick="callSetEntity()">setEntity('lead', 'lead-999')</button>
+    <button onclick="callSetFilter()">setFilter({channels: ['email']})</button>
+    <button onclick="callOpenEvent()">openEvent('evt-1')</button>
+    <button onclick="callDestroy()">destroy()</button>
+    <button onclick="remount()">Re-mount</button>
+  </div>
+
+  <!-- Event log -->
+  <div class="test-section">
+    <h2>Event Log</h2>
+    <div id="log" class="log"></div>
+  </div>
+
+  <!-- Widget container -->
+  <h2>Widget</h2>
+  <div id="timeline-container"></div>
+
+  <!-- STEP 1: Async loader stub (simulates the snippet before SDK loads) -->
+  <script>
+    (function (w) {
+      if (w.CRMCommTimeline && typeof w.CRMCommTimeline.mount === 'function') return;
+      var queue = (w.CRMCommTimeline && w.CRMCommTimeline.q) || [];
+      w.CRMCommTimeline = {
+        q: queue,
+        mount: function () { queue.push(['mount'].concat(Array.prototype.slice.call(arguments))); },
+        unmount: function () { queue.push(['unmount']); },
+        setEntity: function () { queue.push(['setEntity'].concat(Array.prototype.slice.call(arguments))); },
+        refresh: function () { queue.push(['refresh']); },
+        openEvent: function () { queue.push(['openEvent'].concat(Array.prototype.slice.call(arguments))); },
+        setFilter: function () { queue.push(['setFilter'].concat(Array.prototype.slice.call(arguments))); },
+        destroy: function () { queue.push(['destroy']); },
+      };
+    })(window);
+  </script>
+
+  <!-- STEP 2: Queue the mount call BEFORE the SDK loads -->
+  <script>
+    var tokenRefreshCount = 0;
+    var resizeObserved = false;
+
+    // This is called BEFORE the real SDK script loads — tests the queue pattern
+    window.CRMCommTimeline.mount({
+      containerId: 'timeline-container',
+      entityType: 'contact',
+      entityId: 'contact-123',
+      baseUrl: 'http://localhost:8080',
+      widgetUrl: 'http://localhost:3000',
+      theme: 'light',
+      autoResize: true,
+      // Token refresh callback instead of static token
+      getToken: function () {
+        tokenRefreshCount++;
+        document.getElementById('token-count').textContent = tokenRefreshCount;
+        log('info', 'getToken() called — returning fresh token #' + tokenRefreshCount);
+        setBadge('badge-token', 'pass');
+        return Promise.resolve('jwt-test-token-' + Date.now());
+      },
+      onLoaded: function () {
+        log('success', 'Widget loaded! (onLoaded callback fired)');
+        setBadge('badge-queue', 'pass');
+      },
+      onEventClick: function (event) {
+        log('info', 'EVENT_CLICKED: ' + event.eventId + ' (' + event.channel + ')');
+      },
+      onError: function (error) {
+        log('error', 'Widget error: ' + error.code + ' — ' + error.message);
+      },
+    });
+
+    log('info', 'mount() queued before SDK script loaded');
+  </script>
+
+  <!-- STEP 3: Load the real SDK (async, after mount was already called) -->
+  <script src="http://localhost:3001/comm-timeline.umd.cjs" async></script>
+
+  <script>
+    // --- Helpers ---
+    function log(type, msg) {
+      var el = document.getElementById('log');
+      var entry = document.createElement('div');
+      entry.className = 'log-entry ' + type;
+      entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      el.appendChild(entry);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function setBadge(id, state) {
+      var el = document.getElementById(id);
+      el.className = 'badge ' + state;
+      el.textContent = state;
+    }
+
+    // Listen for RESIZE messages from iframe
+    window.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'RESIZE') {
+        var h = e.data.payload.height;
+        document.getElementById('iframe-height').textContent = h + 'px';
+        if (!resizeObserved) {
+          resizeObserved = true;
+          setBadge('badge-resize', 'pass');
+          log('success', 'RESIZE message received: ' + h + 'px');
+        }
+      }
+    });
+
+    // --- Test controls ---
+    function toggleAutoResize() {
+      var container = document.getElementById('timeline-container');
+      container.classList.toggle('auto-resize');
+      log('info', 'Toggled auto-resize mode: ' + container.classList.contains('auto-resize'));
+    }
+
+    function checkSandbox() {
+      var iframe = document.querySelector('#timeline-container iframe');
+      if (!iframe) {
+        setBadge('badge-sandbox', 'fail');
+        log('error', 'No iframe found');
+        return;
+      }
+      var sb = iframe.getAttribute('sandbox');
+      if (sb === 'allow-scripts allow-same-origin allow-popups') {
+        setBadge('badge-sandbox', 'pass');
+        log('success', 'Sandbox attribute correct: ' + sb);
+      } else {
+        setBadge('badge-sandbox', 'fail');
+        log('error', 'Sandbox attribute unexpected: ' + sb);
+      }
+    }
+
+    function markA11yPass() { setBadge('badge-a11y', 'pass'); log('success', 'Keyboard a11y marked PASS'); }
+    function markA11yFail() { setBadge('badge-a11y', 'fail'); log('error', 'Keyboard a11y marked FAIL'); }
+
+    function callRefresh() { window.CRMCommTimeline.refresh(); log('info', 'Called refresh()'); }
+    function callSetEntity() { window.CRMCommTimeline.setEntity('lead', 'lead-999'); log('info', 'Called setEntity()'); }
+    function callSetFilter() { window.CRMCommTimeline.setFilter({ channels: ['email'] }); log('info', 'Called setFilter()'); }
+    function callOpenEvent() { window.CRMCommTimeline.openEvent('evt-1'); log('info', 'Called openEvent()'); }
+    function callDestroy() { window.CRMCommTimeline.destroy(); log('info', 'Called destroy()'); }
+    function remount() { location.reload(); }
+  </script>
+</body>
+</html>

@@ -8,14 +8,18 @@ export interface MountConfig {
   containerId: string;
   entityType: EntityType;
   entityId: string;
-  /** JWT passed to the widget for backend API calls */
-  token: string;
+  /** JWT passed to the widget for backend API calls (static token) */
+  token?: string;
+  /** Async callback to get a fresh JWT. Preferred over static `token`. */
+  getToken?: () => Promise<string>;
   /** Base URL of the backend API, e.g. https://api.example.com */
   baseUrl: string;
   /** URL where the widget app is hosted. Defaults to http://localhost:3000 in dev. */
   widgetUrl?: string;
   theme?: Theme;
   locale?: string;
+  /** Auto-resize iframe height to fit content. Defaults to false. */
+  autoResize?: boolean;
   onEventClick?: (event: { eventId: string; channel: Channel }) => void;
   onLoaded?: () => void;
   onError?: (error: { code: string; message: string }) => void;

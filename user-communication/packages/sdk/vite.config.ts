@@ -11,4 +11,8 @@ export default defineConfig({
       fileName: 'comm-timeline',
     },
   },
+  preview: {
+    port: 3001,
+    cors: true,
+  },
 });

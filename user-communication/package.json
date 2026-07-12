@@ -9,11 +9,15 @@
     "dev:widget": "npm run dev --workspace=packages/widget",
     "dev:sdk": "npm run dev --workspace=packages/sdk",
     "build": "npm run build --workspaces --if-present",
+    "test:integration": "npm run build --workspace=packages/sdk && npx concurrently -k -n widget,sdk,host \"npm run dev --workspace=packages/widget\" \"npm run serve --workspace=packages/sdk\" \"npx serve . --listen 8000\"",
     "db:migrate": "npm run migrate --workspace=packages/backend",
     "docker:up": "docker compose up --build",
     "docker:up:detached": "docker compose up --build -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "docker:db": "docker compose up postgres -d"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

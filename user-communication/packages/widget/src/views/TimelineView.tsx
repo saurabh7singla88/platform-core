@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { TimelineEvent, FilterConfig, Channel } from '../types';
 import { TimelineItem } from '../components/TimelineItem';
 
@@ -30,6 +30,8 @@ function groupByDate(events: TimelineEvent[]): DateGroup[] {
 
 export function TimelineView({ events, filter, onFilterChange, onEventClick }: Props) {
   const [search, setSearch] = useState('');
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     let result = [...events].sort(
@@ -56,6 +58,40 @@ export function TimelineView({ events, filter, onFilterChange, onEventClick }: P
 
   const groups = groupByDate(filtered);
 
+  // Flat list for keyboard navigation
+  const flatEvents = useMemo(() => groups.flatMap((g) => g.events), [groups]);
+
+  const handleListKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusedIndex((prev) => {
+          const next = Math.min(prev + 1, flatEvents.length - 1);
+          focusItem(next);
+          return next;
+        });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusedIndex((prev) => {
+          const next = Math.max(prev - 1, 0);
+          focusItem(next);
+          return next;
+        });
+      } else if (e.key === 'Enter' && focusedIndex >= 0 && focusedIndex < flatEvents.length) {
+        e.preventDefault();
+        onEventClick(flatEvents[focusedIndex]);
+      }
+    },
+    [flatEvents, focusedIndex, onEventClick],
+  );
+
+  function focusItem(index: number) {
+    const items = listRef.current?.querySelectorAll('[data-timeline-item]');
+    if (items?.[index]) {
+      (items[index] as HTMLElement).focus();
+    }
+  }
+
   const toggleChannel = (ch: Channel) => {
     const cur = filter.channels ?? [];
     const next = cur.includes(ch) ? cur.filter((c) => c !== ch) : [...cur, ch];
@@ -65,10 +101,11 @@ export function TimelineView({ events, filter, onFilterChange, onEventClick }: P
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Filter bar */}
-      <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
+      <div role="search" style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
         <input
           type="text"
           placeholder="Search…"
+          aria-label="Search communications"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
@@ -76,13 +113,14 @@ export function TimelineView({ events, filter, onFilterChange, onEventClick }: P
             borderRadius: '6px', fontSize: '0.875rem', marginBottom: '8px',
           }}
         />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+        <div role="group" aria-label="Filter by channel" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
           {ALL_CHANNELS.map((ch) => {
             const active = filter.channels?.includes(ch);
             return (
               <button
                 key={ch}
                 onClick={() => toggleChannel(ch)}
+                aria-pressed={!!active}
                 style={{
                   padding: '3px 10px', borderRadius: '9999px', border: '1px solid',
                   borderColor: active ? '#6366f1' : '#d1d5db',
@@ -99,14 +137,20 @@ export function TimelineView({ events, filter, onFilterChange, onEventClick }: P
       </div>
 
       {/* Timeline list */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div
+        ref={listRef}
+        role="feed"
+        aria-label="Communication timeline"
+        onKeyDown={handleListKeyDown}
+        style={{ flex: 1, overflowY: 'auto' }}
+      >
         {filtered.length === 0 ? (
           <div style={{ padding: '48px 16px', textAlign: 'center', color: '#9ca3af', fontSize: '0.875rem' }}>
             No communications found.
           </div>
         ) : (
           groups.map((group) => (
-            <div key={group.label}>
+            <div key={group.label} role="group" aria-label={group.label}>
               <div style={{
                 padding: '6px 16px', fontSize: '0.72rem', fontWeight: 600,
                 color: '#6b7280', background: '#f9fafb',

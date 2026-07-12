@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { TimelineView } from './views/TimelineView';
 import { DetailView } from './views/DetailView';
 import { usePostMessage } from './hooks/usePostMessage';
+import { useAutoResize } from './hooks/useAutoResize';
 import { HostToWidgetMessage, FilterConfig, WidgetConfig, EntityType } from './types';
 import { mockEvents } from './mockData';
 
@@ -13,6 +14,7 @@ function WidgetApp() {
   // entityType / entityId reserved for Phase 2 real API calls
   const [_entityType, setEntityType] = useState<EntityType>('contact');
   const [_entityId, setEntityId] = useState<string>('contact-123');
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const onMessage = useCallback(
     (msg: HostToWidgetMessage) => {
@@ -36,6 +38,9 @@ function WidgetApp() {
         case 'REFRESH':
           navigate('/');
           break;
+        case 'TOKEN_REFRESH':
+          setConfig((prev) => prev ? { ...prev, token: msg.payload.token } : prev);
+          break;
       }
     },
     [navigate],
@@ -43,13 +48,27 @@ function WidgetApp() {
 
   const { sendToHost } = usePostMessage(onMessage, config?.allowedOrigin);
 
+  // Auto-resize: report content height to host
+  useAutoResize(contentRef, sendToHost);
+
   // Signal to host that the widget is ready
   useEffect(() => {
     sendToHost({ type: 'WIDGET_LOADED' });
   }, [sendToHost]);
 
+  // Global keyboard handler for Escape → go back
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        navigate('/');
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
   return (
-    <div style={{ height: '100%', fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: '14px' }}>
+    <div ref={contentRef} style={{ height: '100%', fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: '14px' }}>
       <Routes>
         <Route
           path="/"

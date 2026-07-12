@@ -21,16 +21,28 @@ export function TimelineItem({ event, onClick }: Props) {
   const to = event.participants.find((p) => p.type === 'to');
   const dirArrow = event.direction === 'inbound' ? '↓' : event.direction === 'outbound' ? '↑' : '↔';
 
+  const label = [
+    event.channel.replace('_', ' '),
+    event.direction,
+    from?.name || from?.identifier,
+    event.subject,
+  ].filter(Boolean).join(' — ');
+
   return (
     <div
-      role="button"
+      role="article"
+      aria-label={label}
+      data-timeline-item
       tabIndex={0}
       onClick={() => onClick(event)}
-      onKeyDown={(e) => e.key === 'Enter' && onClick(event)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(event); } }}
       style={{
         display: 'flex', gap: '12px', padding: '12px 16px',
         borderBottom: '1px solid #f0f0f0', cursor: 'pointer',
+        outline: 'none',
       }}
+      onFocus={(e) => (e.currentTarget.style.background = '#f0f4ff')}
+      onBlur={(e) => (e.currentTarget.style.background = '')}
       onMouseEnter={(e) => (e.currentTarget.style.background = '#f9fafb')}
       onMouseLeave={(e) => (e.currentTarget.style.background = '')}
     >
